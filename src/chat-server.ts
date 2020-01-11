@@ -6,10 +6,13 @@ export class ChatServer {
 
     public static readonly PORT:number = 5000;
     public static readonly SOCKET_IO_EVENT_CONNECTION: string = 'connection';
+    public static readonly SOCKET_IO_EVENT_DISCONNECTION: string = 'disconnect';
+
     private app: express.Application;
     private port: string | number;
     private server: Server;
     private io: socketIo.Server;
+    private socketsArray = [];
 
     constructor() {
         this.createApp();
@@ -33,9 +36,28 @@ export class ChatServer {
             console.log('Running server on port %s', this.port);
         });
 
-        this.io.on(ChatServer.SOCKET_IO_EVENT_CONNECTION, (socket) => {
+        this.io.on('connection', (socket) => {
             socket.broadcast.emit('add-users', {
              users: [socket.id]
+            });
+
+            socket.on('disconnect', () => {
+                this.socketsArray.splice(this.socketsArray.indexOf(socket.id), 1);
+                this.io.emit('remove-user', socket.id);
+            });
+
+            socket.on('make-offer', ({to, offer}) => {
+                socket.to(to).emit('offer-made', {
+                  offer: offer,
+                  socket: socket.id
+                });
+              });
+
+            socket.on('make-answer', ({to, answer}) => {
+                socket.to(to).emit('answer-made', {
+                    socket: socket.id,
+                    answer: answer
+                });
             });
          });
     }
